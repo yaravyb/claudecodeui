@@ -123,7 +123,7 @@ const SetupForm = () => {
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              This is a single-user system. Only one account can be created.
+              Create your account to get started.
             </p>
           </div>
         </div>

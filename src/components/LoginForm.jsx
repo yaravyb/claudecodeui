@@ -7,10 +7,12 @@ const LoginForm = () => {
   const { t } = useTranslation('auth');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showRegister, setShowRegister] = useState(false);
 
-  const { login } = useAuth();
+  const { login, register, allowRegistration } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,15 +23,42 @@ const LoginForm = () => {
       return;
     }
 
-    setIsLoading(true);
-
-    const result = await login(username, password);
-
-    if (!result.success) {
-      setError(result.error);
+    if (showRegister) {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (username.length < 3) {
+        setError('Username must be at least 3 characters long');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long');
+        return;
+      }
     }
 
-    setIsLoading(false);
+    setIsLoading(true);
+
+    try {
+      const result = showRegister
+        ? await register(username, password)
+        : await login(username, password);
+
+      if (!result.success) {
+        setError(result.error);
+      }
+    } catch {
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setShowRegister(!showRegister);
+    setError('');
+    setConfirmPassword('');
   };
 
   return (
@@ -43,13 +72,17 @@ const LoginForm = () => {
                 <MessageSquare className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">{t('login.title')}</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {showRegister ? 'Create Account' : t('login.title')}
+            </h1>
             <p className="text-muted-foreground mt-2">
-              {t('login.description')}
+              {showRegister
+                ? 'Create your account to get started'
+                : t('login.description')}
             </p>
           </div>
 
-          {/* Login Form */}
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-foreground mb-1">
@@ -83,6 +116,24 @@ const LoginForm = () => {
               />
             </div>
 
+            {showRegister && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-1">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm your password"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-md">
                 <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
@@ -94,14 +145,26 @@ const LoginForm = () => {
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
             >
-              {isLoading ? t('login.loading') : t('login.submit')}
+              {isLoading
+                ? (showRegister ? 'Creating account...' : t('login.loading'))
+                : (showRegister ? 'Create Account' : t('login.submit'))}
             </button>
           </form>
 
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Enter your credentials to access Claude Code UI
-            </p>
+            {allowRegistration ? (
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {showRegister ? 'Already have an account? Sign in' : 'Need an account? Create one'}
+              </button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Enter your credentials to access Claude Code UI
+              </p>
+            )}
           </div>
         </div>
       </div>

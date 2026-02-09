@@ -1,0 +1,24 @@
+services:
+  claude-code-ui:
+    build: .
+    ports:
+      - "${HOST_PORT:-3001}:3001"
+    volumes:
+      - claude-data:/data
+      - ${CODEBASE_PATH:-.}:/workspace
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_PATH: /data/auth.db
+      ALLOW_MULTI_USER: "true"
+      WORKSPACES_ROOT: /workspace
+      PORT: "3001"
+      NODE_ENV: production
+    init: true
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+
+volumes:
+  claude-data:
