@@ -9,8 +9,10 @@ const router = express.Router();
 router.get('/status', async (req, res) => {
   try {
     const hasUsers = await userDb.hasUsers();
-    res.json({ 
+    const allowMultiUser = process.env.ALLOW_MULTI_USER === 'true';
+    res.json({
       needsSetup: !hasUsers,
+      allowRegistration: allowMultiUser || !hasUsers,
       isAuthenticated: false // Will be overridden by frontend if token exists
     });
   } catch (error) {
@@ -19,55 +21,64 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// User registration (setup) - only allowed if no users exist
+// User registration - allowed for first user setup, or when ALLOW_MULTI_USER is enabled
 router.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
+
     // Validate input
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required' });
     }
-    
+
     if (username.length < 3 || password.length < 6) {
       return res.status(400).json({ error: 'Username must be at least 3 characters, password at least 6 characters' });
     }
-    
-    // Use a transaction to prevent race conditions
-    db.prepare('BEGIN').run();
+
+    // Hash password before transaction to minimize time the lock is held
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    const allowMultiUser = process.env.ALLOW_MULTI_USER === 'true';
+
+    // BEGIN IMMEDIATE acquires a write lock immediately, preventing race conditions
+    db.prepare('BEGIN IMMEDIATE').run();
     try {
-      // Check if users already exist (only allow one user)
-      const hasUsers = userDb.hasUsers();
-      if (hasUsers) {
-        db.prepare('ROLLBACK').run();
-        return res.status(403).json({ error: 'User already exists. This is a single-user system.' });
+      // Check if users already exist (only allow one user unless multi-user is enabled)
+      if (!allowMultiUser) {
+        const hasUsers = userDb.hasUsers();
+        if (hasUsers) {
+          db.prepare('ROLLBACK').run();
+          return res.status(403).json({ error: 'User already exists. This is a single-user system.' });
+        }
       }
-      
-      // Hash password
-      const saltRounds = 12;
-      const passwordHash = await bcrypt.hash(password, saltRounds);
-      
+
       // Create user
       const user = userDb.createUser(username, passwordHash);
-      
+
       // Generate token
       const token = generateToken(user);
-      
+
       // Update last login
       userDb.updateLastLogin(user.id);
 
+      // In multi-user mode, skip onboarding for new users (shared environment is pre-configured)
+      if (allowMultiUser) {
+        userDb.completeOnboarding(user.id);
+      }
+
       db.prepare('COMMIT').run();
-      
+
       res.json({
         success: true,
         user: { id: user.id, username: user.username },
         token
       });
     } catch (error) {
-      db.prepare('ROLLBACK').run();
+      try { db.prepare('ROLLBACK').run(); } catch (_) { /* already rolled back */ }
       throw error;
     }
-    
+
   } catch (error) {
     console.error('Registration error:', error);
     if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {

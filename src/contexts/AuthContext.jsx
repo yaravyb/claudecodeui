@@ -10,6 +10,7 @@ const AuthContext = createContext({
   logout: () => {},
   isLoading: true,
   needsSetup: false,
+  allowRegistration: false,
   hasCompletedOnboarding: true,
   refreshOnboardingStatus: () => {},
   error: null
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('auth-token'));
   const [isLoading, setIsLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [allowRegistration, setAllowRegistration] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
   const [error, setError] = useState(null);
 
@@ -68,6 +70,8 @@ export const AuthProvider = ({ children }) => {
       // Check if system needs setup
       const statusResponse = await api.auth.status();
       const statusData = await statusResponse.json();
+
+      setAllowRegistration(!!statusData.allowRegistration);
 
       if (statusData.needsSetup) {
         setNeedsSetup(true);
@@ -176,6 +180,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     isLoading,
     needsSetup,
+    allowRegistration,
     hasCompletedOnboarding,
     refreshOnboardingStatus,
     error
