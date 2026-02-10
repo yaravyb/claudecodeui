@@ -52,9 +52,9 @@ COPY public/ ./public/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Create data directory for SQLite database and set ownership
+# Create data directory for SQLite database and workspace sandbox, set ownership
 # Use the built-in 'node' user (UID 1000) from the base image
-RUN mkdir -p /data && chown node:node /data
+RUN mkdir -p /data /workspace && chown node:node /data /workspace
 RUN chown -R node:node /app
 
 USER node
